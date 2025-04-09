@@ -1,9 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { ReactNode } from 'react';
 import ReactECharts from 'echarts-for-react';
 
-export default function EChartsClient() {
+interface EChartsClientProps {
+  children?: ReactNode;
+}
+
+const EChartsClient: React.FC<EChartsClientProps> = ({ children }) => {
   const option = {
     title: {
       text: 'ECharts 入门示例',
@@ -22,5 +26,7 @@ export default function EChartsClient() {
     ],
   };
 
-  return <ReactECharts option={option} style={{ height: 400 }} />;
-}
+  return <>{children}</>;
+};
+
+export default EChartsClient;
