@@ -1,6 +1,12 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { Button, Typography, Box } from '@mui/material';
+
+const EChartsClient = dynamic(() => import('../components/EChartsClient'), {
+  ssr: false,
+});
+
 
 export default function Home() {
   return (
