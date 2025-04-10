@@ -27,6 +27,7 @@ interface StockChartProps {
 
 const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
   const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
   const [timeRange, setTimeRange] = useState<string>('12');
   const [loading, setLoading] = useState(false);
   const [chartData, setChartData] = useState<any[]>([]);
@@ -80,12 +81,25 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
     fetchRangeData(years);
   }, [stockData.code]);
 
-  // 绘制图表
+  // 创建图表实例 - 只在组件挂载时执行一次
   useEffect(() => {
-    if (!chartRef.current || loading || chartData.length === 0) return;
+    // 组件卸载时清理
+    return () => {
+      if (chartInstanceRef.current) {
+        try {
+          chartInstanceRef.current.dispose();
+          chartInstanceRef.current = null;
+        } catch (e) {
+          console.error('清理图表实例失败:', e);
+        }
+      }
+    };
+  }, []); // 空依赖数组，确保只执行一次
 
-    // 初始化ECharts实例
-    const chartInstance = echarts.init(chartRef.current);
+  // 更新图表数据
+  useEffect(() => {
+    // 如果数据加载中或没有数据，不绘制图表
+    if (loading || chartData.length === 0) return;
 
     // 根据选择的时间范围过滤数据
     const rangeValue = parseInt(timeRange);
@@ -96,6 +110,7 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
     const revenue = filteredData.map(item => item.revenue / 1000); // 转换为千元
     const growthRate = filteredData.map(item => item.growthRate);
 
+    // 配置图表选项
     const option = {
       title: {
         text: '月度营收与年增率',
@@ -181,21 +196,37 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
       ]
     };
 
-    // 使用配置项设置图表
-    chartInstance.setOption(option);
+    // DOM更新后执行
+    setTimeout(() => {
+      if (chartRef.current) {
+        try {
+          // 如果实例已存在，先销毁
+          if (chartInstanceRef.current) {
+            chartInstanceRef.current.dispose();
+          }
 
-    // 响应窗口大小变化，调整图表大小
-    const handleResize = () => {
-      chartInstance.resize();
-    };
+          // 创建新实例并设置选项
+          chartInstanceRef.current = echarts.init(chartRef.current);
+          chartInstanceRef.current.setOption(option);
 
-    window.addEventListener('resize', handleResize);
+          // 响应窗口大小变化
+          const handleResize = () => {
+            if (chartInstanceRef.current) {
+              chartInstanceRef.current.resize();
+            }
+          };
 
-    // 清理函数
-    return () => {
-      chartInstance.dispose();
-      window.removeEventListener('resize', handleResize);
-    };
+          window.addEventListener('resize', handleResize);
+
+          // 在下一个更新前移除事件监听
+          return () => {
+            window.removeEventListener('resize', handleResize);
+          };
+        } catch (error) {
+          console.error('初始化图表失败:', error);
+        }
+      }
+    }, 0);
   }, [chartData, timeRange, loading]);
 
   return (
