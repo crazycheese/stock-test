@@ -1,112 +1,155 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   AppBar,
   Toolbar,
   Typography,
-  InputBase,
-  IconButton,
   Box,
-  alpha,
-  styled
+  Autocomplete,
+  TextField,
+  Paper,
+  InputAdornment,
+  IconButton
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
+import { getStockNameMap } from '../services/stockApi';
 
-// 定义props接口
+// 定义接口
 interface NavbarProps {
   onSearch: (query: string) => void;
 }
 
-// 自定义搜索输入框样式
-const Search = styled('div')(({ theme }) => ({
-  position: 'relative',
-  borderRadius: theme.shape.borderRadius,
-  backgroundColor: alpha(theme.palette.common.white, 0.15),
-  '&:hover': {
-    backgroundColor: alpha(theme.palette.common.white, 0.25),
-  },
-  marginRight: 0,
-  marginLeft: 0,
-  width: '100%',
-  maxWidth: '400px',
-  [theme.breakpoints.up('sm')]: {
-    marginLeft: theme.spacing(1),
-    width: 'auto',
-  },
-}));
-
-const SearchIconWrapper = styled('div')(({ theme }) => ({
-  padding: theme.spacing(0, 2),
-  height: '100%',
-  position: 'absolute',
-  pointerEvents: 'none',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-}));
-
-const StyledInputBase = styled(InputBase)(({ theme }) => ({
-  color: 'inherit',
-  '& .MuiInputBase-input': {
-    padding: theme.spacing(1, 1, 1, 0),
-    paddingLeft: `calc(1em + ${theme.spacing(4)})`,
-    transition: theme.transitions.create('width'),
-    width: '100%',
-    [theme.breakpoints.up('md')]: {
-      width: '30ch',
-    },
-  },
-}));
+interface StockOption {
+  code: string;
+  name: string;
+  label: string;
+}
 
 const Navbar: React.FC<NavbarProps> = ({ onSearch }) => {
-  const [searchValue, setSearchValue] = useState('');
+  const [selectedStock, setSelectedStock] = useState<StockOption | undefined>(undefined);
+  const [inputValue, setInputValue] = useState('');
+  const [stockOptions, setStockOptions] = useState<StockOption[]>([]);
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchValue(e.target.value);
-  };
+  // 加载股票列表
+  useEffect(() => {
+    const loadStockOptions = async () => {
+      try {
+        const nameMap = await getStockNameMap();
+        const options: StockOption[] = Object.entries(nameMap).map(([code, name]) => ({
+          code,
+          name,
+          label: `${code} - ${name}`
+        }));
+        setStockOptions(options);
+      } catch (error) {
+        console.error('加载股票列表失败:', error);
+      }
+    };
 
-  const handleSearchSubmit = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      onSearch(searchValue);
+    loadStockOptions();
+  }, []);
+
+  // 修复类型问题
+  const handleStockChange = (_event: React.SyntheticEvent, newValue: StockOption | string | null) => {
+    if (newValue && typeof newValue !== 'string') {
+      setSelectedStock(newValue);
+      onSearch(newValue.code);
+    } else if (typeof newValue === 'string') {
+      // 如果是字符串，可能是freeSolo模式下用户输入的值
+      onSearch(newValue);
     }
   };
 
-  const handleSearchButtonClick = () => {
-    onSearch(searchValue);
+  const handleInputChange = (_event: React.SyntheticEvent, newInputValue: string) => {
+    setInputValue(newInputValue);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' && inputValue.trim()) {
+      // 如果是纯数字或字母数字组合，认为是股票代码，直接搜索
+      if (/^[0-9a-zA-Z]+$/.test(inputValue.trim())) {
+        onSearch(inputValue.trim());
+      }
+    }
+  };
+
+  const handleSearchClick = () => {
+    if (inputValue.trim() && /^[0-9a-zA-Z]+$/.test(inputValue.trim())) {
+      onSearch(inputValue.trim());
+    }
   };
 
   return (
-    <AppBar position="static">
+    <AppBar position="static" color="default" sx={{ backgroundColor: 'white', boxShadow: 1 }}>
       <Toolbar>
-        <Typography
-          variant="h6"
-          noWrap
-          component="div"
-          sx={{ display: { xs: 'none', sm: 'block' } }}
-        >
-          股票分析平台
-        </Typography>
-
-        {/* 居中的搜索框 */}
-        <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center' }}>
-          <Search>
-            <SearchIconWrapper>
-              <SearchIcon />
-            </SearchIconWrapper>
-            <StyledInputBase
-              placeholder="输入股票代码搜索..."
-              inputProps={{ 'aria-label': 'search' }}
-              value={searchValue}
-              onChange={handleSearchChange}
-              onKeyPress={handleSearchSubmit}
-            />
-          </Search>
-          <IconButton
-            color="inherit"
-            onClick={handleSearchButtonClick}
-            sx={{ ml: 1 }}
+        <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', my: 1 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              width: '100%',
+              maxWidth: '500px',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 1,
+              px: 1
+            }}
           >
-            <SearchIcon />
-          </IconButton>
+            <Autocomplete
+              fullWidth
+              options={stockOptions}
+              getOptionLabel={(option) =>
+                typeof option === 'string' ? option : option.label
+              }
+              isOptionEqualToValue={(option, value) =>
+                value ? option.code === value.code : false
+              }
+              value={selectedStock}
+              onChange={handleStockChange}
+              inputValue={inputValue}
+              onInputChange={handleInputChange}
+              autoHighlight
+              freeSolo
+              disableClearable
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  placeholder="输入或选择股票代码..."
+                  variant="standard"
+                  onKeyDown={handleKeyDown}
+                  InputProps={{
+                    ...params.InputProps,
+                    disableUnderline: true,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton
+                          edge="end"
+                          onClick={handleSearchClick}
+                          color="primary"
+                        >
+                          <SearchIcon />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              )}
+              renderOption={(props, option) => (
+                <Box component="li" sx={{ display: 'flex', alignItems: 'center' }} {...props}>
+                  <Box sx={{ fontWeight: 'bold', minWidth: '60px' }}>{option.code}</Box>
+                  <Box sx={{ ml: 2 }}>{option.name}</Box>
+                </Box>
+              )}
+              filterOptions={(options, { inputValue }) => {
+                const filterValue = inputValue.toLowerCase();
+                return options.filter(
+                  option =>
+                    option.code.toLowerCase().includes(filterValue) ||
+                    option.name.toLowerCase().includes(filterValue)
+                );
+              }}
+            />
+          </Paper>
         </Box>
 
         <Box sx={{ flexGrow: 1 }} />
