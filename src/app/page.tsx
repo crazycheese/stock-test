@@ -127,7 +127,7 @@ export default function Home() {
     } else {
       loadStockData(currentStockId);
     }
-  }, [currentStockId, stockNameMap]);
+  }, [currentStockId]);
 
   const handleSearch = (query: string) => {
     if (!query) return;
