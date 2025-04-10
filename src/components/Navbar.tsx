@@ -8,7 +8,8 @@ import {
   TextField,
   Paper,
   InputAdornment,
-  IconButton
+  IconButton,
+  Container
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import { getStockNameMap } from '../services/stockApi';
@@ -80,80 +81,80 @@ const Navbar: React.FC<NavbarProps> = ({ onSearch }) => {
 
   return (
     <AppBar position="static" color="default" sx={{ backgroundColor: 'white', boxShadow: 1 }}>
-      <Toolbar>
-        <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', my: 1 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              width: '100%',
-              maxWidth: '500px',
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 1,
-              px: 1
-            }}
-          >
-            <Autocomplete
-              fullWidth
-              options={stockOptions}
-              getOptionLabel={(option) =>
-                typeof option === 'string' ? option : option.label
-              }
-              isOptionEqualToValue={(option, value) =>
-                value ? option.code === value.code : false
-              }
-              value={selectedStock}
-              onChange={handleStockChange}
-              inputValue={inputValue}
-              onInputChange={handleInputChange}
-              autoHighlight
-              freeSolo
-              disableClearable
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  placeholder="输入或选择股票代码..."
-                  variant="standard"
-                  onKeyDown={handleKeyDown}
-                  InputProps={{
-                    ...params.InputProps,
-                    disableUnderline: true,
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          edge="end"
-                          onClick={handleSearchClick}
-                          color="primary"
-                        >
-                          <SearchIcon />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              )}
-              renderOption={(props, option) => (
-                <Box component="li" sx={{ display: 'flex', alignItems: 'center' }} {...props}>
-                  <Box sx={{ fontWeight: 'bold', minWidth: '60px' }}>{option.code}</Box>
-                  <Box sx={{ ml: 2 }}>{option.name}</Box>
-                </Box>
-              )}
-              filterOptions={(options, { inputValue }) => {
-                const filterValue = inputValue.toLowerCase();
-                return options.filter(
-                  option =>
-                    option.code.toLowerCase().includes(filterValue) ||
-                    option.name.toLowerCase().includes(filterValue)
-                );
+      <Container maxWidth="lg">
+        <Toolbar sx={{ justifyContent: 'center' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', my: 1 }}>
+            <Paper
+              elevation={0}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                width: '100%',
+                maxWidth: '500px',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                px: 1
               }}
-            />
-          </Paper>
-        </Box>
-
-        <Box sx={{ flexGrow: 1 }} />
-      </Toolbar>
+            >
+              <Autocomplete
+                fullWidth
+                options={stockOptions}
+                getOptionLabel={(option) =>
+                  typeof option === 'string' ? option : option.label
+                }
+                isOptionEqualToValue={(option, value) =>
+                  value ? option.code === value.code : false
+                }
+                value={selectedStock}
+                onChange={handleStockChange}
+                inputValue={inputValue}
+                onInputChange={handleInputChange}
+                autoHighlight
+                freeSolo
+                disableClearable
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder="输入台/美股票代码，查看公司价值"
+                    variant="standard"
+                    onKeyDown={handleKeyDown}
+                    InputProps={{
+                      ...params.InputProps,
+                      disableUnderline: true,
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            edge="end"
+                            onClick={handleSearchClick}
+                            color="primary"
+                          >
+                            <SearchIcon />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                )}
+                renderOption={(props, option) => (
+                  <Box component="li" sx={{ display: 'flex', alignItems: 'center' }} {...props}>
+                    <Box sx={{ fontWeight: 'bold', minWidth: '60px' }}>{option.code}</Box>
+                    <Box sx={{ ml: 2 }}>{option.name}</Box>
+                  </Box>
+                )}
+                filterOptions={(options, { inputValue }) => {
+                  const filterValue = inputValue.toLowerCase();
+                  return options.filter(
+                    option =>
+                      option.code.toLowerCase().includes(filterValue) ||
+                      option.name.toLowerCase().includes(filterValue)
+                  );
+                }}
+              />
+            </Paper>
+          </Box>
+        </Toolbar>
+      </Container>
     </AppBar>
   );
 };

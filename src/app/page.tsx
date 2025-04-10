@@ -61,8 +61,14 @@ const theme = createTheme({
     secondary: {
       main: '#dc004e',
     },
-    background: {
-      default: '#f5f5f5',
+  },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          backgroundColor: 'rgb(247, 247, 247)',
+        },
+      },
     },
   },
 });
@@ -135,7 +141,6 @@ export default function Home() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <Navbar onSearch={handleSearch} />
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4, flex: 1 }}>
           {loading ? (
@@ -164,7 +169,6 @@ export default function Home() {
             </>
           )}
         </Container>
-      </Box>
     </ThemeProvider>
   );
 }
