@@ -118,7 +118,7 @@ const MonthlyRevenueTable: React.FC<{ stockData: StockData }> = ({ stockData }) 
           </TableRow>
 
           {/* 增长率行 */}
-          <TableRow>
+          {/* <TableRow>
             <TableCell component="th" scope="row">同比增长率 (%)</TableCell>
             {stockData.monthlyRevenue.map((item) => (
               <TableCell
@@ -131,7 +131,7 @@ const MonthlyRevenueTable: React.FC<{ stockData: StockData }> = ({ stockData }) 
                 {item.growthRate >= 0 ? '+' : ''}{item.growthRate.toFixed(1)}%
               </TableCell>
             ))}
-          </TableRow>
+          </TableRow> */}
         </TableBody>
       </Table>
     </TableContainer>

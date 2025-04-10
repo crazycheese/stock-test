@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Box, Typography, ToggleButtonGroup, ToggleButton } from '@mui/material';
+import { Box, Typography, Select, MenuItem, FormControl, InputLabel, CircularProgress } from '@mui/material';
 import * as echarts from 'echarts';
-import { StockPriceData } from '../services/stockApi';
+import {
+  StockPriceData,
+  MonthRevenueData,
+  getStockPriceData,
+  processStockData,
+  getMonthlyRevenue
+} from '../services/stockApi';
 
 // 定义props接口
 interface StockData {
@@ -13,7 +19,7 @@ interface StockData {
   monthlyRevenue: Array<{
     month: string;
     revenue: number;
-    growthRate: number;
+    growthRate: number | null;
   }>;
   stockPriceData: StockPriceData[];
 }
@@ -22,40 +28,152 @@ interface StockChartProps {
   stockData: StockData;
 }
 
-type ChartType = 'price' | 'volume' | 'revenue';
-
 const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
   const chartRef = useRef<HTMLDivElement>(null);
-  const [chartType, setChartType] = useState<ChartType>('price');
+  const [timeRange, setTimeRange] = useState<string>('12');
+  const [loading, setLoading] = useState(false);
+  const [chartData, setChartData] = useState<any>(null);
 
-  // 处理图表类型变更
-  const handleChartTypeChange = (
-    event: React.MouseEvent<HTMLElement>,
-    newChartType: ChartType | null,
-  ) => {
-    if (newChartType !== null) {
-      setChartType(newChartType);
+  // 获取指定时间范围内的数据
+  const fetchRangeData = async (years: number) => {
+    try {
+      setLoading(true);
+
+      // 计算开始日期和结束日期
+      const endDate = new Date();
+      // 增加额外的1年数据，用于计算同比增长率
+      const startDate = new Date();
+      startDate.setFullYear(endDate.getFullYear() - years - 1);
+
+      const formattedStartDate = startDate.toISOString().split('T')[0];
+      const formattedEndDate = endDate.toISOString().split('T')[0];
+
+      // 分别获取股票价格数据和月度营收数据
+      const [priceData, revenueData] = await Promise.all([
+        getStockPriceData(stockData.code, formattedStartDate, formattedEndDate),
+        getMonthlyRevenue(stockData.code, formattedStartDate, formattedEndDate)
+      ]);
+
+      // 处理数据
+      if (priceData && priceData.length > 0) {
+        const processedData = processStockData(priceData, stockData.name, revenueData);
+        setChartData(processedData);
+      }
+    } catch (error) {
+      console.error('获取数据失败:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // 处理时间范围变更
+  const handleTimeRangeChange = async (event: any) => {
+    const newRange = event.target.value;
+    setTimeRange(newRange);
+
+    // 根据选择的时间范围获取数据
+    const years = parseInt(newRange) / 12;
+    await fetchRangeData(years);
+  };
+
+  // 初始加载数据
   useEffect(() => {
-    if (!chartRef.current) return;
+    const years = parseInt(timeRange) / 12;
+    fetchRangeData(years);
+  }, [stockData.code]);
+
+  // 绘制图表
+  useEffect(() => {
+    if (!chartRef.current || loading || !chartData) return;
 
     // 初始化ECharts实例
     const chartInstance = echarts.init(chartRef.current);
 
-    let option: any = {};
+    // 根据选择的时间范围过滤数据
+    const rangeValue = parseInt(timeRange);
+    const revenueData = chartData.monthlyRevenue || [];
+    const filteredData = revenueData.slice(-rangeValue);
 
-    if (chartType === 'price') {
-      // 价格图表
-      option = createPriceChartOption(stockData);
-    } else if (chartType === 'volume') {
-      // 交易量图表
-      option = createVolumeChartOption(stockData);
-    } else if (chartType === 'revenue') {
-      // 营收图表
-      option = createRevenueChartOption(stockData);
-    }
+    // 提取数据
+    const months = filteredData.map((item: any) => item.month);
+    const revenue = filteredData.map((item: any) => item.revenue);
+    const growthRate = filteredData.map((item: any) => item.growthRate);
+
+    const option = {
+      title: {
+        text: '月度营收与年增率',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'cross',
+          crossStyle: {
+            color: '#999'
+          }
+        },
+        formatter: function(params: any) {
+          const monthData = params[0];
+          const growthData = params[1];
+          return `${monthData.axisValue}<br/>${monthData.seriesName}: ${(monthData.data / 1000000).toFixed(2)} 百万元<br/>${growthData.seriesName}: ${growthData.data !== null ? growthData.data.toFixed(2) : 'N/A'}%`;
+        }
+      },
+      legend: {
+        data: ['月度营收(百万元)', '年增率(%)'],
+        bottom: 10
+      },
+      xAxis: [
+        {
+          type: 'category',
+          data: months,
+          axisPointer: {
+            type: 'shadow'
+          },
+          axisLabel: {
+            rotate: 45
+          }
+        }
+      ],
+      yAxis: [
+        {
+          type: 'value',
+          name: '营收(百万元)',
+          min: 0,
+          axisLabel: {
+            formatter: '{value} M'
+          }
+        },
+        {
+          type: 'value',
+          name: '年增率(%)',
+          axisLabel: {
+            formatter: '{value} %'
+          }
+        }
+      ],
+      series: [
+        {
+          name: '月度营收(百万元)',
+          type: 'bar',
+          data: revenue.map((v: number) => v / 1000000), // 转换为百万元
+          itemStyle: {
+            color: '#eba431'
+          }
+        },
+        {
+          name: '年增率(%)',
+          type: 'line',
+          yAxisIndex: 1,
+          data: growthRate,
+          lineStyle: {
+            color: '#cb3e46'
+          },
+          itemStyle: {
+            color: '#cb3e46'
+          }
+        }
+      ]
+    };
 
     // 使用配置项设置图表
     chartInstance.setOption(option);
@@ -72,303 +190,39 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
       chartInstance.dispose();
       window.removeEventListener('resize', handleResize);
     };
-  }, [stockData, chartType]);
+  }, [chartData, timeRange, loading]);
 
   return (
     <Box>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">股票数据图表</Typography>
-
-        <ToggleButtonGroup
-          value={chartType}
-          exclusive
-          onChange={handleChartTypeChange}
-          size="small"
-        >
-          <ToggleButton value="price">价格走势</ToggleButton>
-          <ToggleButton value="volume">交易量</ToggleButton>
-          <ToggleButton value="revenue">月度营收</ToggleButton>
-        </ToggleButtonGroup>
+        <Typography variant="h6">月度营收分析</Typography>
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <InputLabel>时间范围</InputLabel>
+          <Select
+            value={timeRange}
+            label="时间范围"
+            onChange={handleTimeRangeChange}
+            disabled={loading}
+          >
+            <MenuItem value="6">近6个月</MenuItem>
+            <MenuItem value="12">近1年</MenuItem>
+            <MenuItem value="24">近2年</MenuItem>
+            <MenuItem value="36">近3年</MenuItem>
+            <MenuItem value="48">近4年</MenuItem>
+            <MenuItem value="60">近5年</MenuItem>
+          </Select>
+        </FormControl>
       </Box>
 
-      <Box ref={chartRef} style={{ width: '100%', height: '400px' }} />
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+          <CircularProgress />
+        </Box>
+      ) : (
+        <Box ref={chartRef} style={{ width: '100%', height: '400px' }} />
+      )}
     </Box>
   );
-};
-
-// 创建价格图表配置
-const createPriceChartOption = (stockData: StockData) => {
-  // 提取数据
-  const dates = stockData.stockPriceData.map(item => item.date);
-  const prices = stockData.stockPriceData.map(item => item.close);
-
-  return {
-    title: {
-      text: `${stockData.name}(${stockData.code}) 价格走势`,
-      left: 'center'
-    },
-    tooltip: {
-      trigger: 'axis',
-      formatter: function(params: any) {
-        const data = params[0].data;
-        return `日期: ${params[0].axisValue}<br/>收盘价: ${data}`;
-      }
-    },
-    toolbox: {
-      feature: {
-        dataZoom: { show: true },
-        restore: { show: true },
-        saveAsImage: { show: true }
-      }
-    },
-    xAxis: {
-      type: 'category',
-      data: dates,
-      axisLabel: {
-        rotate: 45,
-        formatter: function(value: string) {
-          return value;
-        }
-      }
-    },
-    yAxis: {
-      type: 'value',
-      name: '价格',
-      axisLabel: {
-        formatter: '{value} 元'
-      },
-      scale: true
-    },
-    dataZoom: [
-      {
-        type: 'inside',
-        start: 50,
-        end: 100
-      },
-      {
-        start: 50,
-        end: 100
-      }
-    ],
-    series: [
-      {
-        name: '收盘价',
-        type: 'line',
-        data: prices,
-        lineStyle: {
-          width: 2
-        },
-        itemStyle: {
-          color: '#1976d2'
-        }
-      }
-    ]
-  };
-};
-
-// 创建交易量图表配置
-const createVolumeChartOption = (stockData: StockData) => {
-  // 提取数据
-  const dates = stockData.stockPriceData.map(item => item.date);
-  const volumes = stockData.stockPriceData.map(item => item.Trading_Volume);
-
-  // 计算交易量的MA5和MA10
-  const ma5 = calculateMA(5, volumes);
-  const ma10 = calculateMA(10, volumes);
-
-  return {
-    title: {
-      text: `${stockData.name}(${stockData.code}) 交易量`,
-      left: 'center'
-    },
-    tooltip: {
-      trigger: 'axis',
-      formatter: function(params: any) {
-        let result = `日期: ${params[0].axisValue}<br/>`;
-        params.forEach((param: any) => {
-          result += `${param.seriesName}: ${param.data / 1000000} 百万<br/>`;
-        });
-        return result;
-      }
-    },
-    legend: {
-      data: ['交易量', 'MA5', 'MA10'],
-      bottom: 10
-    },
-    toolbox: {
-      feature: {
-        dataZoom: { show: true },
-        restore: { show: true },
-        saveAsImage: { show: true }
-      }
-    },
-    xAxis: {
-      type: 'category',
-      data: dates,
-      axisLabel: {
-        rotate: 45
-      }
-    },
-    yAxis: {
-      type: 'value',
-      name: '交易量',
-      axisLabel: {
-        formatter: function(value: number) {
-          return `${(value / 1000000).toFixed(1)}M`;
-        }
-      }
-    },
-    dataZoom: [
-      {
-        type: 'inside',
-        start: 50,
-        end: 100
-      },
-      {
-        start: 50,
-        end: 100
-      }
-    ],
-    series: [
-      {
-        name: '交易量',
-        type: 'bar',
-        data: volumes,
-        itemStyle: {
-          color: '#2196f3'
-        }
-      },
-      {
-        name: 'MA5',
-        type: 'line',
-        data: ma5,
-        smooth: true,
-        lineStyle: {
-          opacity: 0.7
-        }
-      },
-      {
-        name: 'MA10',
-        type: 'line',
-        data: ma10,
-        smooth: true,
-        lineStyle: {
-          opacity: 0.7
-        }
-      }
-    ]
-  };
-};
-
-// 创建营收图表配置
-const createRevenueChartOption = (stockData: StockData) => {
-  // 提取数据
-  const months = stockData.monthlyRevenue.map(item => item.month);
-  const revenue = stockData.monthlyRevenue.map(item => item.revenue);
-  const growthRate = stockData.monthlyRevenue.map(item => item.growthRate);
-
-  return {
-    title: {
-      text: '月度营收与增长率',
-      left: 'center'
-    },
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'cross',
-        crossStyle: {
-          color: '#999'
-        }
-      },
-      formatter: function(params: any) {
-        const monthData = params[0];
-        const growthData = params[1];
-        return `${monthData.axisValue}<br/>${monthData.seriesName}: ${monthData.data} 百万元<br/>${growthData.seriesName}: ${growthData.data.toFixed(1)}%`;
-      }
-    },
-    toolbox: {
-      feature: {
-        dataView: { show: true, readOnly: false },
-        magicType: { show: true, type: ['line', 'bar'] },
-        restore: { show: true },
-        saveAsImage: { show: true }
-      }
-    },
-    legend: {
-      data: ['月度营收(百万元)', '同比增长率(%)'],
-      bottom: 10
-    },
-    xAxis: [
-      {
-        type: 'category',
-        data: months,
-        axisPointer: {
-          type: 'shadow'
-        },
-        axisLabel: {
-          rotate: 45
-        }
-      }
-    ],
-    yAxis: [
-      {
-        type: 'value',
-        name: '营收',
-        min: 0,
-        axisLabel: {
-          formatter: '{value} M'
-        }
-      },
-      {
-        type: 'value',
-        name: '增长率',
-        axisLabel: {
-          formatter: '{value} %'
-        }
-      }
-    ],
-    series: [
-      {
-        name: '月度营收(百万元)',
-        type: 'bar',
-        data: revenue,
-        itemStyle: {
-          color: '#1976d2'
-        }
-      },
-      {
-        name: '同比增长率(%)',
-        type: 'line',
-        yAxisIndex: 1,
-        data: growthRate,
-        lineStyle: {
-          color: '#f44336'
-        },
-        itemStyle: {
-          color: function(params: any) {
-            return params.data >= 0 ? '#4caf50' : '#f44336';
-          }
-        }
-      }
-    ]
-  };
-};
-
-// 计算移动平均线
-const calculateMA = (dayCount: number, data: number[]) => {
-  const result = [];
-  for (let i = 0; i < data.length; i++) {
-    if (i < dayCount - 1) {
-      result.push('-');
-      continue;
-    }
-    let sum = 0;
-    for (let j = 0; j < dayCount; j++) {
-      sum += data[i - j];
-    }
-    result.push((sum / dayCount).toFixed(0));
-  }
-  return result;
 };
 
 export default StockChart;
