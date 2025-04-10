@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { Box, Typography, Select, MenuItem, FormControl, InputLabel, CircularProgress } from '@mui/material';
 import * as echarts from 'echarts';
 import {
@@ -23,65 +23,28 @@ interface StockData {
 
 interface StockChartProps {
   stockData: StockData;
+  timeRange: string;
+  onTimeRangeChange: (range: string) => void;
 }
 
-const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
+const StockChart: React.FC<StockChartProps> = ({ stockData, timeRange, onTimeRangeChange }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<echarts.ECharts | null>(null);
-  const [timeRange, setTimeRange] = useState<string>('12');
   const [loading, setLoading] = useState(false);
-  const [chartData, setChartData] = useState<any[]>([]);
 
-  // 获取指定时间范围内的数据
-  const fetchRangeData = async (years: number) => {
-    try {
-      setLoading(true);
-
-      // 计算开始日期和结束日期
-      const endDate = new Date();
-      // 增加额外的1年数据，用于计算同比增长率
-      const startDate = new Date();
-      startDate.setFullYear(endDate.getFullYear() - years - 1);
-
-      const formattedStartDate = startDate.toISOString().split('T')[0];
-      const formattedEndDate = endDate.toISOString().split('T')[0];
-
-      // 获取月度营收数据
-      const revenueData = await getMonthlyRevenue(
-        stockData.code,
-        formattedStartDate,
-        formattedEndDate
-      );
-
-      // 处理数据
-      if (revenueData && revenueData.length > 0) {
-        const processedData = processMonthlyRevenueData(revenueData);
-        setChartData(processedData);
-      }
-    } catch (error) {
-      console.error('获取数据失败:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // 根据timeRange过滤数据
+  const filteredData = useMemo(() => {
+    const months = parseInt(timeRange);
+    return stockData.monthlyRevenue.slice(-months);
+  }, [stockData.monthlyRevenue, timeRange]);
 
   // 处理时间范围变更
   const handleTimeRangeChange = async (event: any) => {
     const newRange = event.target.value;
-    setTimeRange(newRange);
-
-    // 根据选择的时间范围获取数据
-    const years = parseInt(newRange) / 12;
-    await fetchRangeData(years);
+    onTimeRangeChange(newRange);
   };
 
-  // 初始加载数据
-  useEffect(() => {
-    const years = parseInt(timeRange) / 12;
-    fetchRangeData(years);
-  }, [stockData.code]);
-
-  // 创建图表实例 - 只在组件挂载时执行一次
+  // 初始加载数据和timeRange变化时重新渲染图表
   useEffect(() => {
     // 组件卸载时清理
     return () => {
@@ -98,12 +61,8 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
 
   // 更新图表数据
   useEffect(() => {
-    // 如果数据加载中或没有数据，不绘制图表
-    if (loading || chartData.length === 0) return;
-
-    // 根据选择的时间范围过滤数据
-    const rangeValue = parseInt(timeRange);
-    const filteredData = chartData.slice(-rangeValue);
+    // 如果没有数据，不绘制图表
+    if (filteredData.length === 0) return;
 
     // 提取数据
     const months = filteredData.map(item => item.month);
@@ -227,7 +186,7 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
         }
       }
     }, 0);
-  }, [chartData, timeRange, loading]);
+  }, [filteredData]);
 
   return (
     <Box>

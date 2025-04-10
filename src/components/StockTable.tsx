@@ -9,7 +9,7 @@ import {
   Typography,
   Box
 } from '@mui/material';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 
 // 定义props接口
 interface StockData {
@@ -27,11 +27,18 @@ interface StockData {
 
 interface StockTableProps {
   stockData: StockData;
+  timeRange: string;
 }
 
-const StockTable: React.FC<StockTableProps> = ({ stockData }) => {
+const StockTable: React.FC<StockTableProps> = ({ stockData, timeRange }) => {
   // 创建一个引用来获取表格容器
   const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  // 根据timeRange过滤数据
+  const filteredData = useMemo(() => {
+    const months = parseInt(timeRange);
+    return stockData.monthlyRevenue.slice(-months);
+  }, [stockData.monthlyRevenue, timeRange]);
 
   // 首次加载时滚动到最右侧
   useEffect(() => {
@@ -40,7 +47,7 @@ const StockTable: React.FC<StockTableProps> = ({ stockData }) => {
       // 滚动到最右侧
       container.scrollLeft = container.scrollWidth;
     }
-  }, [stockData]); // 当stockData变化时重新滚动
+  }, [filteredData]); // 当filteredData变化时重新滚动
 
   return (
     <Box>
@@ -68,7 +75,7 @@ const StockTable: React.FC<StockTableProps> = ({ stockData }) => {
               >
                 指标
               </TableCell>
-              {stockData.monthlyRevenue.map((item) => (
+              {filteredData.map((item) => (
                 <TableCell
                   key={item.month}
                   align="right"
@@ -104,7 +111,7 @@ const StockTable: React.FC<StockTableProps> = ({ stockData }) => {
               >
                 每月营收 (千元)
               </TableCell>
-              {stockData.monthlyRevenue.map((item) => (
+              {filteredData.map((item) => (
                 <TableCell key={`revenue-${item.month}`} align="right">
                   {(item.revenue / 1000).toLocaleString('zh-CN', {
                     minimumFractionDigits: 2,
@@ -129,7 +136,7 @@ const StockTable: React.FC<StockTableProps> = ({ stockData }) => {
               >
                 年增率 (%)
               </TableCell>
-              {stockData.monthlyRevenue.map((item) => (
+              {filteredData.map((item) => (
                 <TableCell
                   key={`growth-${item.month}`}
                   align="right"

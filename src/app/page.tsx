@@ -78,6 +78,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [stockNameMap, setStockNameMap] = useState<Record<string, string>>({});
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [timeRange, setTimeRange] = useState<string>('12');
 
   // 加载股票名称映射表
   useEffect(() => {
@@ -106,26 +107,26 @@ export default function Home() {
     setError(null);
 
     try {
-      const startDate = getDefaultStartDate();
+      // 获取足够长的历史数据，以支持最长的时间范围选择（5年）
       const endDate = getDefaultEndDate();
+      const startDate = new Date();
+      startDate.setFullYear(startDate.getFullYear() - 6); // 获取6年的数据，额外1年用于计算同比增长
+      const formattedStartDate = startDate.toISOString().split('T')[0];
 
       // 获取月度营收数据
-      const revenueData = await getMonthlyRevenue(stockId, startDate, endDate);
+      const revenueData = await getMonthlyRevenue(stockId, formattedStartDate, endDate);
 
       if (revenueData && revenueData.length > 0) {
         const processedRevenue = processMonthlyRevenueData(revenueData);
 
-        // 只保留最近12个月的数据
-        const recent12Months = processedRevenue.slice(-12);
-
-        // 创建股票数据对象
+        // 创建股票数据对象，不限制月数
         const processedData = {
           code: stockId,
           name: stockNameMap[stockId] || stockId,
           price: 0, // 这里可以根据需要获取最新价格
           change: 0,
           changePercent: 0,
-          monthlyRevenue: recent12Months
+          monthlyRevenue: processedRevenue
         };
 
         setStockData(processedData);
@@ -152,6 +153,11 @@ export default function Home() {
     loadStockData(query.trim());
   };
 
+  // 处理时间范围变更
+  const handleTimeRangeChange = (newRange: string) => {
+    setTimeRange(newRange);
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -171,13 +177,20 @@ export default function Home() {
 
               <Box sx={{ mt: 3 }}>
                 <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-                  <StockChart stockData={stockData} />
+                  <StockChart
+                    stockData={stockData}
+                    timeRange={timeRange}
+                    onTimeRangeChange={handleTimeRangeChange}
+                  />
                 </Paper>
               </Box>
 
               <Box sx={{ mt: 3 }}>
                 <Paper elevation={3} sx={{ p: 3 }}>
-                  <StockTable stockData={stockData} />
+                  <StockTable
+                    stockData={stockData}
+                    timeRange={timeRange}
+                  />
                 </Paper>
               </Box>
             </>
