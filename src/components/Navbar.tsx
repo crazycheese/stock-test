@@ -12,42 +12,37 @@ import {
   Container
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
-import { getStockNameMap } from '../services/stockApi';
 
 // 定义接口
 interface NavbarProps {
   onSearch: (query: string) => void;
+  stockNameMap: Record<string, string>;
 }
 
 interface StockOption {
   code: string;
   name: string;
   label: string;
+  disabled?: boolean;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ onSearch }) => {
+const Navbar: React.FC<NavbarProps> = ({ onSearch, stockNameMap }) => {
   const [selectedStock, setSelectedStock] = useState<StockOption | undefined>(undefined);
   const [inputValue, setInputValue] = useState('');
   const [stockOptions, setStockOptions] = useState<StockOption[]>([]);
+  const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
 
-  // 加载股票列表
+  // 使用传入的stockNameMap生成选项
   useEffect(() => {
-    const loadStockOptions = async () => {
-      try {
-        const nameMap = await getStockNameMap();
-        const options: StockOption[] = Object.entries(nameMap).map(([code, name]) => ({
-          code,
-          name,
-          label: `${code} - ${name}`
-        }));
-        setStockOptions(options);
-      } catch (error) {
-        console.error('加载股票列表失败:', error);
-      }
-    };
-
-    loadStockOptions();
-  }, []);
+    if (Object.keys(stockNameMap).length > 0) {
+      const options: StockOption[] = Object.entries(stockNameMap).map(([code, name]) => ({
+        code,
+        name,
+        label: `${code} - ${name}`
+      }));
+      setStockOptions(options);
+    }
+  }, [stockNameMap]);
 
   // 修复类型问题
   const handleStockChange = (_event: React.SyntheticEvent, newValue: StockOption | string | null) => {
@@ -77,6 +72,11 @@ const Navbar: React.FC<NavbarProps> = ({ onSearch }) => {
     if (inputValue.trim() && /^[0-9a-zA-Z]+$/.test(inputValue.trim())) {
       onSearch(inputValue.trim());
     }
+  };
+
+  const handleSelect = (option: StockOption) => {
+    setSelectedStock(option);
+    onSearch(option.code);
   };
 
   return (
@@ -113,6 +113,23 @@ const Navbar: React.FC<NavbarProps> = ({ onSearch }) => {
                 autoHighlight
                 freeSolo
                 disableClearable
+                sx={{ width: '100%' }}
+                PaperComponent={({ children }) => (
+                  <Paper
+                    sx={{
+                      width: '100%',
+                      maxWidth: '500px',
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 1,
+                      mt: 1
+                    }}
+                  >
+                    {children}
+                  </Paper>
+                )}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -134,21 +151,41 @@ const Navbar: React.FC<NavbarProps> = ({ onSearch }) => {
                         </InputAdornment>
                       ),
                     }}
+                    sx={{ width: '100%' }}
                   />
                 )}
-                renderOption={(props, option) => (
-                  <Box component="li" sx={{ display: 'flex', alignItems: 'center' }} {...props}>
-                    <Box sx={{ fontWeight: 'bold', minWidth: '60px' }}>{option.code}</Box>
-                    <Box sx={{ ml: 2 }}>{option.name}</Box>
-                  </Box>
-                )}
+                renderOption={(props, option, state) => {
+                  const index = stockOptions.indexOf(option);
+
+                  return (
+                    <Box
+                      key={option.code}
+                      component="li"
+                      sx={{ display: 'flex', alignItems: 'center' }}
+                      tabIndex={-1}
+                      role="option"
+                      id={`stock-option-${index}`}
+                      onClick={() => {
+                        handleSelect(option);
+                      }}
+                      aria-disabled={option.disabled}
+                      aria-selected={state.selected}
+                    >
+                      <Box sx={{ fontWeight: 'bold', minWidth: '60px' }}>{option.code}</Box>
+                      <Box sx={{ ml: 2 }}>{option.name}</Box>
+                    </Box>
+                  );
+                }}
                 filterOptions={(options, { inputValue }) => {
+                  if (!inputValue) return [];
+
                   const filterValue = inputValue.toLowerCase();
+                  // 限制返回的选项数量，提高性能
                   return options.filter(
                     option =>
                       option.code.toLowerCase().includes(filterValue) ||
                       option.name.toLowerCase().includes(filterValue)
-                  );
+                  ).slice(0, 50); // 最多显示50个匹配结果
                 }}
               />
             </Paper>

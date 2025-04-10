@@ -161,7 +161,7 @@ export default function Home() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-        <Navbar onSearch={handleSearch} />
+        <Navbar onSearch={handleSearch} stockNameMap={stockNameMap} />
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4, flex: 1 }}>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
