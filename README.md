@@ -1,22 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 项目说明
 
-## Getting Started
+这是一个使用 [Next.js](https://nextjs.org) 构建的项目。
 
-First, run the development server:
+## 启动方式
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+要在本地开发和运行该项目，请按照以下步骤操作：
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. 克隆项目到本地：
+   ```bash
+   git clone <your-repo-url>
+   cd <your-project-directory>
+   ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+2. 安装依赖：
+   ```bash
+   npm install
+   # 或者使用 yarn
+   # yarn install
+   ```
+
+3. 启动开发服务器：
+   ```bash
+   npm run dev
+   # 或者使用 yarn
+   # yarn dev
+   ```
+
+4. 打开浏览器访问 [http://localhost:3000](http://localhost:3000) 查看结果。
+
+在开发过程中，您可以直接编辑 `app/page.tsx` 文件，页面会自动更新。
+
+## 部署规划
+
+该项目已部署并托管在 [Vercel](https://vercel.com) 平台上，使用 CI/CD 流程进行自动化部署。只需将代码推送到主分支，Vercel 将自动构建并部署最新版本的应用。
+
+有关 Vercel 部署的更多信息，请参阅 [Vercel 文档](https://vercel.com/docs)。
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

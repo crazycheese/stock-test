@@ -29,29 +29,6 @@ const getDefaultEndDate = () => {
   return new Date().toISOString().split('T')[0];
 };
 
-// 模拟数据 - 当API无法获取数据时使用
-const mockStockData = {
-  code: '2330',
-  name: '台积电',
-  price: 593.0,
-  change: 3.0,
-  changePercent: 0.51,
-  monthlyRevenue: [
-    { month: '2023-01', revenue: 1200, growthRate: 8.5 },
-    { month: '2023-02', revenue: 980, growthRate: 5.2 },
-    { month: '2023-03', revenue: 1350, growthRate: 12.3 },
-    { month: '2023-04', revenue: 1450, growthRate: 15.8 },
-    { month: '2023-05', revenue: 1380, growthRate: 10.1 },
-    { month: '2023-06', revenue: 1520, growthRate: 18.5 },
-    { month: '2023-07', revenue: 1620, growthRate: 22.7 },
-    { month: '2023-08', revenue: 1550, growthRate: 16.9 },
-    { month: '2023-09', revenue: 1480, growthRate: 14.2 },
-    { month: '2023-10', revenue: 1600, growthRate: 19.8 },
-    { month: '2023-11', revenue: 1750, growthRate: 25.3 },
-    { month: '2023-12', revenue: 1900, growthRate: 30.1 },
-  ]
-};
-
 // 创建主题
 const theme = createTheme({
   palette: {
@@ -80,6 +57,7 @@ export default function Home() {
   const [stockNameMap, setStockNameMap] = useState<Record<string, string>>({});
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [timeRange, setTimeRange] = useState<string>('12');
+  const [currentStockId, setCurrentStockId] = useState<string>(DEFAULT_STOCK_ID); // 默认股票ID
 
   // 加载股票名称映射表
   useEffect(() => {
@@ -99,32 +77,25 @@ export default function Home() {
   const loadStockData = async (stockId: string) => {
     if (!stockId) return;
 
-    // 保存到搜索历史
-    if (!searchHistory.includes(stockId)) {
-      setSearchHistory(prev => [...prev, stockId].slice(-5)); // 只保留最近5个
-    }
-
     setLoading(true);
     setError(null);
 
     try {
-      // 获取足够长的历史数据，以支持最长的时间范围选择（5年）
       const endDate = getDefaultEndDate();
       const startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 6); // 获取6年的数据，额外1年用于计算同比增长
+      startDate.setFullYear(startDate.getFullYear() - 6);
       const formattedStartDate = startDate.toISOString().split('T')[0];
 
-      // 获取月度营收数据
       const revenueData = await getMonthlyRevenue(stockId, formattedStartDate, endDate);
 
       if (revenueData && revenueData.length > 0) {
         const processedRevenue = processMonthlyRevenueData(revenueData);
+        const stockName = stockNameMap[stockId] || stockId;
 
-        // 创建股票数据对象，不限制月数
         const processedData = {
           code: stockId,
-          name: stockNameMap[stockId] || stockId,
-          price: 0, // 这里可以根据需要获取最新价格
+          name: stockName,
+          price: 0,
           change: 0,
           changePercent: 0,
           monthlyRevenue: processedRevenue
@@ -133,12 +104,12 @@ export default function Home() {
         setStockData(processedData);
       } else {
         setError('没有找到股票数据');
-        setStockData(mockStockData); // 使用模拟数据作为备用
+        setStockData(null); // 清空数据
       }
     } catch (err) {
       console.error('加载股票数据失败:', err);
-      setError('获取股票数据时出错，使用模拟数据代替');
-      setStockData(mockStockData); // 使用模拟数据作为备用
+      setError('获取股票数据时出错');
+      setStockData(null); // 清空数据
     } finally {
       setLoading(false);
     }
@@ -147,12 +118,20 @@ export default function Home() {
   // 首次加载默认股票
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const stockId = urlParams.get('stock') || DEFAULT_STOCK_ID; // 从URL获取股票代码
-    loadStockData(stockId);
-  }, []);
+    const stockId = urlParams.get('stock') || currentStockId; // 从URL获取股票代码
+
+    // 只在currentStockId变化时加载数据
+    if (currentStockId !== stockId) {
+      setCurrentStockId(stockId);
+      loadStockData(stockId);
+    } else {
+      loadStockData(currentStockId);
+    }
+  }, [currentStockId, stockNameMap]);
 
   const handleSearch = (query: string) => {
     if (!query) return;
+    setCurrentStockId(query.trim()); // 更新当前股票ID
     loadStockData(query.trim());
   };
 
@@ -164,41 +143,39 @@ export default function Home() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-        <Navbar onSearch={handleSearch} stockNameMap={stockNameMap} />
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4, flex: 1 }}>
-          {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
-              <CircularProgress />
+      <Navbar onSearch={handleSearch} stockNameMap={stockNameMap} />
+      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, flex: 1 }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>
+        ) : null}
+
+        {stockData && (
+          <>
+            <StockHeader stockData={stockData} />
+            <Box sx={{ mt: 3 }}>
+              <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+                <StockChart
+                  stockData={stockData}
+                  timeRange={timeRange}
+                  onTimeRangeChange={handleTimeRangeChange}
+                />
+              </Paper>
             </Box>
-          ) : error ? (
-            <Alert severity="warning" sx={{ mb: 2 }}>{error}</Alert>
-          ) : null}
-
-          {stockData && (
-            <>
-              <StockHeader stockData={stockData} />
-
-              <Box sx={{ mt: 3 }}>
-                <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
-                  <StockChart
-                    stockData={stockData}
-                    timeRange={timeRange}
-                    onTimeRangeChange={handleTimeRangeChange}
-                  />
-                </Paper>
-              </Box>
-
-              <Box sx={{ mt: 3 }}>
-                <Paper elevation={3} sx={{ p: 3 }}>
-                  <StockTable
-                    stockData={stockData}
-                    timeRange={timeRange}
-                  />
-                </Paper>
-              </Box>
-            </>
-          )}
-        </Container>
+            <Box sx={{ mt: 3 }}>
+              <Paper elevation={3} sx={{ p: 3 }}>
+                <StockTable
+                  stockData={stockData}
+                  timeRange={timeRange}
+                />
+              </Paper>
+            </Box>
+          </>
+        )}
+      </Container>
     </ThemeProvider>
   );
 }
