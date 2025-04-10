@@ -15,6 +15,7 @@ const StockChart = dynamic(() => import('../components/StockChart'), {
 
 // 默认股票代码
 const DEFAULT_STOCK_ID = '2330';
+const DEFAULT_STOCK_NAME = '台积电';
 
 // 获取近一年的数据
 const getDefaultStartDate = () => {
@@ -145,7 +146,9 @@ export default function Home() {
 
   // 首次加载默认股票
   useEffect(() => {
-    loadStockData(DEFAULT_STOCK_ID);
+    const urlParams = new URLSearchParams(window.location.search);
+    const stockId = urlParams.get('stock') || DEFAULT_STOCK_ID; // 从URL获取股票代码
+    loadStockData(stockId);
   }, []);
 
   const handleSearch = (query: string) => {

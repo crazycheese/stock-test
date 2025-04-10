@@ -27,7 +27,7 @@ interface StockOption {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ onSearch, stockNameMap }) => {
-  const [selectedStock, setSelectedStock] = useState<StockOption | undefined>(undefined);
+  const [selectedStock, setSelectedStock] = useState<StockOption | null>(null);
   const [inputValue, setInputValue] = useState('');
   const [stockOptions, setStockOptions] = useState<StockOption[]>([]);
   const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
@@ -76,7 +76,13 @@ const Navbar: React.FC<NavbarProps> = ({ onSearch, stockNameMap }) => {
 
   const handleSelect = (option: StockOption) => {
     setSelectedStock(option);
+    setInputValue(option.label);
     onSearch(option.code);
+
+    // 更新 URL
+    const url = new URL(window.location.href);
+    url.searchParams.set('stock', option.code);
+    window.history.pushState({}, '', url);
   };
 
   return (
@@ -90,7 +96,7 @@ const Navbar: React.FC<NavbarProps> = ({ onSearch, stockNameMap }) => {
                 display: 'flex',
                 alignItems: 'center',
                 width: '100%',
-                maxWidth: '500px',
+                maxWidth: '340px',
                 border: '1px solid',
                 borderColor: 'divider',
                 borderRadius: 1,
@@ -106,13 +112,17 @@ const Navbar: React.FC<NavbarProps> = ({ onSearch, stockNameMap }) => {
                 isOptionEqualToValue={(option, value) =>
                   value ? option.code === value.code : false
                 }
-                value={selectedStock}
-                onChange={handleStockChange}
+                value={selectedStock as StockOption | undefined}                onChange={(event, newValue) => {
+                  handleStockChange(event, newValue);
+                  if (newValue) {
+                    setInputValue(newValue.label);
+                  }
+                }}
                 inputValue={inputValue}
                 onInputChange={handleInputChange}
                 autoHighlight
-                freeSolo
                 disableClearable
+                onClose={() => { /* 不再清空输入框的值 */ }}
                 sx={{ width: '100%' }}
                 PaperComponent={({ children }) => (
                   <Paper
@@ -161,7 +171,15 @@ const Navbar: React.FC<NavbarProps> = ({ onSearch, stockNameMap }) => {
                     <Box
                       key={option.code}
                       component="li"
-                      sx={{ display: 'flex', alignItems: 'center' }}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        padding: '8px',
+                        cursor: 'pointer',
+                        '&:hover': {
+                          backgroundColor: 'action.hover',
+                        },
+                      }}
                       tabIndex={-1}
                       role="option"
                       id={`stock-option-${index}`}
