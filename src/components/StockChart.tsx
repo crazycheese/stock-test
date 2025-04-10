@@ -2,11 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Box, Typography, Select, MenuItem, FormControl, InputLabel, CircularProgress } from '@mui/material';
 import * as echarts from 'echarts';
 import {
-  StockPriceData,
   MonthRevenueData,
-  getStockPriceData,
-  processStockData,
-  getMonthlyRevenue
+  getMonthlyRevenue,
+  processMonthlyRevenueData
 } from '../services/stockApi';
 
 // 定义props接口
@@ -21,7 +19,6 @@ interface StockData {
     revenue: number;
     growthRate: number | null;
   }>;
-  stockPriceData: StockPriceData[];
 }
 
 interface StockChartProps {
@@ -32,7 +29,7 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [timeRange, setTimeRange] = useState<string>('12');
   const [loading, setLoading] = useState(false);
-  const [chartData, setChartData] = useState<any>(null);
+  const [chartData, setChartData] = useState<any[]>([]);
 
   // 获取指定时间范围内的数据
   const fetchRangeData = async (years: number) => {
@@ -48,15 +45,16 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
       const formattedStartDate = startDate.toISOString().split('T')[0];
       const formattedEndDate = endDate.toISOString().split('T')[0];
 
-      // 分别获取股票价格数据和月度营收数据
-      const [priceData, revenueData] = await Promise.all([
-        getStockPriceData(stockData.code, formattedStartDate, formattedEndDate),
-        getMonthlyRevenue(stockData.code, formattedStartDate, formattedEndDate)
-      ]);
+      // 获取月度营收数据
+      const revenueData = await getMonthlyRevenue(
+        stockData.code,
+        formattedStartDate,
+        formattedEndDate
+      );
 
       // 处理数据
-      if (priceData && priceData.length > 0) {
-        const processedData = processStockData(priceData, stockData.name, revenueData);
+      if (revenueData && revenueData.length > 0) {
+        const processedData = processMonthlyRevenueData(revenueData);
         setChartData(processedData);
       }
     } catch (error) {
@@ -84,20 +82,19 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
 
   // 绘制图表
   useEffect(() => {
-    if (!chartRef.current || loading || !chartData) return;
+    if (!chartRef.current || loading || chartData.length === 0) return;
 
     // 初始化ECharts实例
     const chartInstance = echarts.init(chartRef.current);
 
     // 根据选择的时间范围过滤数据
     const rangeValue = parseInt(timeRange);
-    const revenueData = chartData.monthlyRevenue || [];
-    const filteredData = revenueData.slice(-rangeValue);
+    const filteredData = chartData.slice(-rangeValue);
 
     // 提取数据
-    const months = filteredData.map((item: any) => item.month);
-    const revenue = filteredData.map((item: any) => item.revenue);
-    const growthRate = filteredData.map((item: any) => item.growthRate);
+    const months = filteredData.map(item => item.month);
+    const revenue = filteredData.map(item => item.revenue / 1000); // 转换为千元
+    const growthRate = filteredData.map(item => item.growthRate);
 
     const option = {
       title: {
@@ -115,11 +112,18 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
         formatter: function(params: any) {
           const monthData = params[0];
           const growthData = params[1];
-          return `${monthData.axisValue}<br/>${monthData.seriesName}: ${(monthData.data / 1000000).toFixed(2)} 百万元<br/>${growthData.seriesName}: ${growthData.data !== null ? growthData.data.toFixed(2) : 'N/A'}%`;
+
+          // 添加千位分隔符
+          const formattedRevenue = monthData.data.toLocaleString('zh-CN', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          });
+
+          return `${monthData.axisValue}<br/>${monthData.seriesName}: ${formattedRevenue}千元<br/>${growthData.seriesName}: ${growthData.data !== null ? growthData.data.toFixed(2) : 'N/A'}%`;
         }
       },
       legend: {
-        data: ['月度营收(百万元)', '年增率(%)'],
+        data: ['月度营收(千元)', '年增率(%)'],
         bottom: 10
       },
       xAxis: [
@@ -137,10 +141,12 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
       yAxis: [
         {
           type: 'value',
-          name: '营收(百万元)',
+          name: '营收(千元)',
           min: 0,
           axisLabel: {
-            formatter: '{value} M'
+            formatter: function(value: number) {
+              return value.toLocaleString('zh-CN');
+            }
           }
         },
         {
@@ -153,9 +159,9 @@ const StockChart: React.FC<StockChartProps> = ({ stockData }) => {
       ],
       series: [
         {
-          name: '月度营收(百万元)',
+          name: '月度营收(千元)',
           type: 'bar',
-          data: revenue.map((v: number) => v / 1000000), // 转换为百万元
+          data: revenue,
           itemStyle: {
             color: '#eba431'
           }

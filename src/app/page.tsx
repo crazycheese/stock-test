@@ -6,7 +6,7 @@ import { Container, Box, Paper, CssBaseline, ThemeProvider, createTheme, Circula
 import Navbar from '../components/Navbar';
 import StockHeader from '../components/StockHeader';
 import StockTable from '../components/StockTable';
-import { getStockPriceData, processStockData, getStockNameMap } from '../services/stockApi';
+import { getStockNameMap, getMonthlyRevenue, processMonthlyRevenueData } from '../services/stockApi';
 
 // 动态导入ECharts组件，禁用SSR
 const StockChart = dynamic(() => import('../components/StockChart'), {
@@ -19,7 +19,7 @@ const DEFAULT_STOCK_ID = '2330';
 // 获取近一年的数据
 const getDefaultStartDate = () => {
   const date = new Date();
-  date.setFullYear(date.getFullYear() - 1);
+  date.setFullYear(date.getFullYear() - 2); // 获取两年的数据，以便计算同比增长率
   return date.toISOString().split('T')[0];
 };
 
@@ -48,8 +48,7 @@ const mockStockData = {
     { month: '2023-10', revenue: 1600, growthRate: 19.8 },
     { month: '2023-11', revenue: 1750, growthRate: 25.3 },
     { month: '2023-12', revenue: 1900, growthRate: 30.1 },
-  ],
-  stockPriceData: []
+  ]
 };
 
 // 创建主题
@@ -110,10 +109,25 @@ export default function Home() {
       const startDate = getDefaultStartDate();
       const endDate = getDefaultEndDate();
 
-      const stockPriceData = await getStockPriceData(stockId, startDate, endDate);
+      // 获取月度营收数据
+      const revenueData = await getMonthlyRevenue(stockId, startDate, endDate);
 
-      if (stockPriceData && stockPriceData.length > 0) {
-        const processedData = processStockData(stockPriceData, stockNameMap[stockId] || stockId);
+      if (revenueData && revenueData.length > 0) {
+        const processedRevenue = processMonthlyRevenueData(revenueData);
+
+        // 只保留最近12个月的数据
+        const recent12Months = processedRevenue.slice(-12);
+
+        // 创建股票数据对象
+        const processedData = {
+          code: stockId,
+          name: stockNameMap[stockId] || stockId,
+          price: 0, // 这里可以根据需要获取最新价格
+          change: 0,
+          changePercent: 0,
+          monthlyRevenue: recent12Months
+        };
+
         setStockData(processedData);
       } else {
         setError('没有找到股票数据');

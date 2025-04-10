@@ -1,5 +1,4 @@
 import { Box, Typography, Paper } from '@mui/material';
-import { StockPriceData } from '../services/stockApi';
 
 // 定义props接口
 interface StockData {
@@ -11,9 +10,8 @@ interface StockData {
   monthlyRevenue: Array<{
     month: string;
     revenue: number;
-    growthRate: number;
+    growthRate: number | null;
   }>;
-  stockPriceData: StockPriceData[];
 }
 
 interface StockHeaderProps {
