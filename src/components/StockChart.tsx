@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { Box, Typography, Select, MenuItem, FormControl, InputLabel, CircularProgress } from '@mui/material';
 import * as echarts from 'echarts';
-import {
-  MonthRevenueData,
-  getMonthlyRevenue,
-  processMonthlyRevenueData
-} from '../services/stockApi';
-
 // 定义props接口
 interface StockData {
   name: string;

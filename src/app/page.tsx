@@ -17,13 +17,6 @@ const StockChart = dynamic(() => import('../components/StockChart'), {
 const DEFAULT_STOCK_ID = '2330';
 const DEFAULT_STOCK_NAME = '台积电';
 
-// 获取近一年的数据
-const getDefaultStartDate = () => {
-  const date = new Date();
-  date.setFullYear(date.getFullYear() - 2); // 获取两年的数据，以便计算同比增长率
-  return date.toISOString().split('T')[0];
-};
-
 // 获取今天的日期
 const getDefaultEndDate = () => {
   return new Date().toISOString().split('T')[0];
@@ -59,22 +52,25 @@ export default function Home() {
   const [timeRange, setTimeRange] = useState<string>('12');
   const [currentStockId, setCurrentStockId] = useState<string>(DEFAULT_STOCK_ID); // 默认股票ID
 
-  // 加载股票名称映射表
+  // 加载股票名称映射表和股票数据
   useEffect(() => {
-    const loadStockNameMap = async () => {
+    const loadStockNameMapAndData = async () => {
       try {
         const nameMap = await getStockNameMap();
         setStockNameMap(nameMap);
+
+        // 加载股票数据
+        await loadStockData(currentStockId, nameMap); // 传递最新的 nameMap
       } catch (err) {
         console.error('获取股票名称映射失败:', err);
       }
     };
 
-    loadStockNameMap();
+    loadStockNameMapAndData();
   }, []);
 
   // 加载股票数据
-  const loadStockData = async (stockId: string) => {
+  const loadStockData = async (stockId: string, nameMap: Record<string, string>) => {
     if (!stockId) return;
 
     setLoading(true);
@@ -90,7 +86,7 @@ export default function Home() {
 
       if (revenueData && revenueData.length > 0) {
         const processedRevenue = processMonthlyRevenueData(revenueData);
-        const stockName = stockNameMap[stockId] || stockId;
+        const stockName = nameMap[stockId] || stockId; // 使用传入的最新 nameMap
 
         const processedData = {
           code: stockId,
@@ -115,24 +111,10 @@ export default function Home() {
     }
   };
 
-  // 首次加载默认股票
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const stockId = urlParams.get('stock') || currentStockId; // 从URL获取股票代码
-
-    // 只在currentStockId变化时加载数据
-    if (currentStockId !== stockId) {
-      setCurrentStockId(stockId);
-      loadStockData(stockId);
-    } else {
-      loadStockData(currentStockId);
-    }
-  }, [currentStockId]);
-
   const handleSearch = (query: string) => {
     if (!query) return;
     setCurrentStockId(query.trim()); // 更新当前股票ID
-    loadStockData(query.trim());
+    loadStockData(query.trim(), stockNameMap); // 传递当前的 stockNameMap
   };
 
   // 处理时间范围变更
