@@ -50,7 +50,7 @@ export default function Home() {
   const [stockNameMap, setStockNameMap] = useState<Record<string, string>>({});
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [timeRange, setTimeRange] = useState<string>('12');
-  const [currentStockId, setCurrentStockId] = useState<string>(DEFAULT_STOCK_ID); // 默认股票ID
+  const [currentStockId, setCurrentStockId] = useState<string>(''); // 初始值为空字符串
 
   // 加载股票名称映射表和股票数据
   useEffect(() => {
@@ -59,8 +59,13 @@ export default function Home() {
         const nameMap = await getStockNameMap();
         setStockNameMap(nameMap);
 
+        // 从URL获取股票代码
+        const urlParams = new URLSearchParams(window.location.search);
+        const stockId = urlParams.get('stock') || DEFAULT_STOCK_ID; // 从URL获取股票代码
+        setCurrentStockId(stockId); // 设置当前股票ID
+
         // 加载股票数据
-        await loadStockData(currentStockId, nameMap); // 传递最新的 nameMap
+        await loadStockData(stockId, nameMap); // 传递最新的 nameMap
       } catch (err) {
         console.error('获取股票名称映射失败:', err);
       }
